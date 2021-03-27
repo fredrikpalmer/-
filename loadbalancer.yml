@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  LoadBalancer stack
+Parameters:
+  AppName:
+    Description: Name of application
+    Type: String
+
+  Environment:
+    Description: Environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - stage
+      - prod
+  
+Resources:
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application 
+      Name: !Sub ${Environment}-${AppName}-lb
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - Fn::ImportValue: 
+            !Sub "${Environment}-${AppName}-lb-sg"
+      Subnets:
+        - Fn::ImportValue: 
+            !Sub "${Environment}-${AppName}-public-AZ-A-SubnetID"
+        - Fn::ImportValue: 
+            !Sub "${Environment}-${AppName}-public-AZ-B-SubnetID"
+        - Fn::ImportValue: 
+            !Sub "${Environment}-${AppName}-public-AZ-C-SubnetID"
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  ServiceListener:
+   Type: "AWS::ElasticLoadBalancingV2::Listener"
+   Properties:
+     DefaultActions:
+       - Type: "forward"
+         TargetGroupARN: !Ref ServiceTargetGroup
+     LoadBalancerArn: !Ref LoadBalancer
+     Port: 80
+     Protocol: "HTTP"
+
+  TraefikListener:
+   Type: "AWS::ElasticLoadBalancingV2::Listener"
+   Properties:
+     DefaultActions:
+       - Type: "forward"
+         TargetGroupARN: !Ref TraefikTargetGroup
+     LoadBalancerArn: !Ref LoadBalancer
+     Port: 8080
+     Protocol: "HTTP"
+
+  ServiceTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${Environment}-${AppName}-service-tg"
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /ping
+      HealthCheckPort: 8080
+      HealthCheckProtocol: HTTP
+      VpcId: 
+        Fn::ImportValue:
+          !Sub "${Environment}-${AppName}-VPCID"
+
+  TraefikTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${Environment}-${AppName}-traefik-tg"
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /ping
+      HealthCheckPort: 8080
+      HealthCheckProtocol: HTTP
+      VpcId: 
+        Fn::ImportValue:
+          !Sub "${Environment}-${AppName}-VPCID"
+  
+Outputs:
+  StackLoadBalancer:
+    Description: The arn of the LoadBalancer
+    Value: !Ref LoadBalancer
+    Export: 
+      Name: !Sub ${Environment}-${AppName}-lb-ARN
+
+  StackLoadBalancerDNSName:
+    Description: The dns name of the LoadBalancer
+    Value:
+      Fn::GetAtt:
+      - LoadBalancer
+      - DNSName
+    Export: 
+      Name: !Sub ${Environment}-${AppName}-lb-DNS
+
+  StackDefaultTargetGroup:
+    Description: The arn of the target group
+    Value: !Ref ServiceTargetGroup
+    Export: 
+      Name: !Sub ${Environment}-${AppName}-service-tg-ARN
+
+  StackDashboardTargetGroup:
+    Description: The arn of the target group
+    Value: !Ref TraefikTargetGroup
+    Export: 
+      Name: !Sub ${Environment}-${AppName}-traefik-tg-ARN

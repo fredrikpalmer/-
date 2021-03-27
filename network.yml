@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Network stack
+
+Parameters:
+  AppName:
+    Description: Name of application
+    Type: String
+  
+  Environment:
+    Description: Environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - stage
+      - prod
+  
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1a
+      CidrBlock: 10.0.0.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1b
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1c
+      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1a
+      CidrBlock: 10.0.10.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1b
+      CidrBlock: 10.0.12.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: eu-north-1c
+      CidrBlock: 10.0.14.0/24
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+  
+  EIPA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::GetAtt:
+        - EIPA
+        - AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  EIPB:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::GetAtt:
+        - EIPB
+        - AllocationId
+      SubnetId: !Ref PublicSubnetB
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  EIPC:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  NatGatewayC:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::GetAtt:
+        - EIPC
+        - AllocationId
+      SubnetId: !Ref PublicSubnetC
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  EgressRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+      RouteTableId: !Ref PrivateRouteTableA
+
+  EgressRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+      RouteTableId: !Ref PrivateRouteTableB
+
+  EgressRouteC:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  IngressRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+
+  PublicSubnetAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetB
+
+  PublicSubnetAssociationC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetC
+
+  PrivateSubnetAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref PrivateSubnetA
+
+  PrivateSubnetAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      SubnetId: !Ref PrivateSubnetB
+
+  PrivateSubnetAssociationC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      SubnetId: !Ref PrivateSubnetC
+
+Outputs:
+  StackVPC:
+    Description: The ID of the VPC
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${Environment}-${AppName}-VPCID"
+  
+  StackPublicSubnetA:
+    Description: The ID of the public subnet
+    Value: !Ref PublicSubnetA
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-public-AZ-A-SubnetID"
+
+  StackPublicSubnetB:
+    Description: The ID of the public subnet
+    Value: !Ref PublicSubnetB
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-public-AZ-B-SubnetID"
+
+  StackPublicSubnetC:
+    Description: The ID of the public subnet
+    Value: !Ref PublicSubnetC
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-public-AZ-C-SubnetID"
+
+  StackPrivateSubnetA:
+    Description: The ID of the private subnet
+    Value: !Ref PrivateSubnetA
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-private-AZ-A-SubnetID"
+
+  StackPrivateSubnetB:
+    Description: The ID of the private subnet
+    Value: !Ref PrivateSubnetB
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-private-AZ-B-SubnetID"
+
+  StackPrivateSubnetC:
+    Description: The ID of the private subnet
+    Value: !Ref PrivateSubnetC
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-private-AZ-C-SubnetID"
+  
+  StackEIPA:
+    Description: The elastic ip address
+    Value: !Ref EIPA
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-AZ-A-EIP"
+
+  StackEIPB:
+    Description: The elastic ip address
+    Value: !Ref EIPB
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-AZ-B-EIP"
+
+  StackEIPC:
+    Description: The elastic ip address
+    Value: !Ref EIPC
+    Export: 
+      Name: !Sub "${Environment}-${AppName}-AZ-C-EIP"

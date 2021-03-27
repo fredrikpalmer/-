@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  ECS cluster stack
+Parameters:
+  AppName:
+    Description: Name of application
+    Type: String
+
+  Environment:
+    Description: Environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - stage
+      - prod
+  
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${Environment}-${AppName}-ecs-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  TraefikECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${Environment}-${AppName}-traefik-ecs-service"
+      TaskDefinition:
+        Ref: TraefikECSTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-traefik-sg"
+          Subnets:
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-A-SubnetID"
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-B-SubnetID"
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-C-SubnetID"
+      DesiredCount: 1
+      LoadBalancers:
+      - TargetGroupArn:
+          Fn::ImportValue:
+            !Sub "${Environment}-${AppName}-service-tg-ARN"
+        ContainerPort: 80
+        ContainerName: traefik
+      - TargetGroupArn:
+          Fn::ImportValue:
+            !Sub "${Environment}-${AppName}-traefik-tg-ARN"
+        ContainerPort: 8080
+        ContainerName: traefik  
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+            Enable: true
+            Rollback: true
+      Cluster:
+        Ref: ECSCluster
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  TraefikECSTaskDefinition: 
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      Family: !Sub "${Environment}-${AppName}-traefik-task-definition"
+      RequiresCompatibilities:
+        - "FARGATE"
+      NetworkMode: awsvpc
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      ContainerDefinitions: 
+        - Name: "traefik"
+          Image: "traefik:v2.3.0"
+          EntryPoint: ["traefik", "--providers.ecs.clusters", "dev-fp-ecs-cluster", "--log.level", "DEBUG", "--providers.ecs.region", !Ref "AWS::Region", "--api.insecure", "--ping"]
+          Secrets:
+            - Name: "AWS_ACCESS_KEY_ID"
+              ValueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:aws/credentials-3kj7ja:AWS_ACCESS_KEY_ID::"
+            - Name: "AWS_SECRET_ACCESS_KEY"
+              ValueFrom: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:aws/credentials-3kj7ja:AWS_SECRET_ACCESS_KEY::"
+          PortMappings:
+            - containerPort: 80
+            - containerPort: 8080
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options: 
+              "awslogs-group": "/ecs/traefik"
+              "awslogs-region": !Ref "AWS::Region"
+              "awslogs-stream-prefix": "traefik"
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  WhoamiECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${Environment}-${AppName}-whoami-ecs-service"
+      TaskDefinition:
+        Ref: WhoamiECSTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-traefik-sg"
+          Subnets:
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-A-SubnetID"
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-B-SubnetID"
+            - Fn::ImportValue:
+                !Sub "${Environment}-${AppName}-private-AZ-C-SubnetID"
+      DesiredCount: 1 
+      Cluster:
+        Ref: ECSCluster
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
+
+  WhoamiECSTaskDefinition: 
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      Family: !Sub "${Environment}-${AppName}-whoami-task-definition"
+      RequiresCompatibilities:
+        - "FARGATE"
+      NetworkMode: awsvpc
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: arn:aws:iam::686603013795:role/ecsTaskExecutionRole
+      ContainerDefinitions: 
+        - Name: "whoami"
+          Image: "containous/whoami:v1.5.0"
+          PortMappings:
+            - containerPort: 80
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options: 
+              "awslogs-group": "/ecs/whoami"
+              "awslogs-region": !Ref "AWS::Region"
+              "awslogs-stream-prefix": "whoami"
+          DockerLabels: 
+            "traefik.enable": "true"
+            "traefik.http.routers.subdomain_site.rule": Host(`whoami.fredrikpalmer.com`)
+      Tags: 
+        - Key: app
+          Value: !Ref AppName
+        - Key: env
+          Value: !Ref Environment
