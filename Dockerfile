@@ -8,12 +8,21 @@ RUN aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
 RUN aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
 RUN aws configure set region ${AWS_REGION}
 
+COPY commander.sh .
+RUN chmod +x commander.sh
+
 COPY deploy.sh .
 RUN chmod +x deploy.sh
 
-COPY execute-command.sh .
-RUN chmod +x execute-command.sh
+COPY deploy-stack.sh .
+RUN chmod +x deploy-stack.sh
+
+COPY destroy.sh .
+RUN chmod +x destroy.sh
+
+COPY destroy-stack.sh .
+RUN chmod +x destroy-stack.sh
 
 COPY . .
 
-ENTRYPOINT [ "./deploy.sh" ] 
+ENTRYPOINT [ "./commander.sh" ] 
